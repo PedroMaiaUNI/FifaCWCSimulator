@@ -5,10 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { CheckCircle2, XCircle, Trophy } from "lucide-react"
+import { CheckCircle2, XCircle, Trophy, AlertCircle } from "lucide-react"
 import { GROUPS, KNOCKOUT_STRUCTURE } from "@/lib/tournament-data"
 import { storageService } from "@/lib/storage-service"
-import type { Prediction, TournamentResults } from "@/lib/types"
+import type { Prediction, TournamentResults, KnockoutMatch } from "@/lib/types"
 
 interface PredictionAnalysisProps {
   prediction: Prediction
@@ -58,8 +58,6 @@ export function PredictionAnalysis({ prediction, onBack }: PredictionAnalysisPro
   }
 
   useEffect(() => {
-    if (!results) return
-
     // Initialize analysis structure
     const groupPoints: Record<string, number> = {}
     const knockoutPoints: Record<string, number> = {}
@@ -86,7 +84,7 @@ export function PredictionAnalysis({ prediction, onBack }: PredictionAnalysisPro
     }
 
     // Analyze group predictions
-    if (prediction.groupPredictions && results.groupResults) {
+    if (prediction.groupPredictions && results?.groupResults) {
       Object.keys(GROUPS).forEach((group) => {
         const userPrediction = prediction.groupPredictions[group] || []
         const actualQualified = results.groupResults?.[group]?.qualified || []
@@ -123,72 +121,76 @@ export function PredictionAnalysis({ prediction, onBack }: PredictionAnalysisPro
     }
 
     // Analyze knockout predictions
-    if (prediction.knockoutPredictions && results.knockoutResults) {
+    if (prediction.knockoutPredictions) {
       Object.keys(prediction.knockoutPredictions).forEach((matchId) => {
         const userPrediction = prediction.knockoutPredictions[matchId]
-        const actualResult = results.knockoutResults?.[matchId]
-
-        if (!actualResult) return // Skip if no actual result yet
+        const actualResult = results?.knockoutResults?.[matchId]
 
         let matchScore = 0
         const matchAnalysis = {
           winner: {
             team: userPrediction.winner,
-            correct: userPrediction.winner === actualResult.winner,
+            correct: actualResult ? userPrediction.winner === actualResult.winner : false,
           },
           score: {
             predicted: [userPrediction.regularTime1, userPrediction.regularTime2] as [number, number],
-            actual: [actualResult.regularTime1, actualResult.regularTime2] as [number, number],
-            correct:
-              userPrediction.regularTime1 === actualResult.regularTime1 &&
-              userPrediction.regularTime2 === actualResult.regularTime2,
+            actual: actualResult
+              ? ([actualResult.regularTime1, actualResult.regularTime2] as [number, number])
+              : ([0, 0] as [number, number]),
+            correct: actualResult
+              ? userPrediction.regularTime1 === actualResult.regularTime1 &&
+                userPrediction.regularTime2 === actualResult.regularTime2
+              : false,
           },
           extraTime: {
             predicted: userPrediction.wentToExtraTime,
-            actual: actualResult.wentToExtraTime || false,
-            correct: userPrediction.wentToExtraTime === (actualResult.wentToExtraTime || false),
+            actual: actualResult?.wentToExtraTime || false,
+            correct: actualResult ? userPrediction.wentToExtraTime === (actualResult.wentToExtraTime || false) : false,
           },
           penalties: {
             predicted: userPrediction.penaltyWinner || "",
-            actual: actualResult.penaltyWinner || "",
-            correct: (userPrediction.penaltyWinner || "") === (actualResult.penaltyWinner || ""),
+            actual: actualResult?.penaltyWinner || "",
+            correct: actualResult ? (userPrediction.penaltyWinner || "") === (actualResult.penaltyWinner || "") : false,
           },
           points: 0,
         }
 
-        // Calculate points based on match phase
-        const phase = getMatchPhase(matchId)
-        const basePoints = getBasePointsByPhase(phase)
+        // Calculate points only if there are actual results to compare
+        if (actualResult) {
+          // Calculate points based on match phase
+          const phase = getMatchPhase(matchId)
+          const basePoints = getBasePointsByPhase(phase)
 
-        // Points for correct winner
-        if (matchAnalysis.winner.correct) {
-          matchScore += basePoints
-        }
+          // Points for correct winner
+          if (matchAnalysis.winner.correct) {
+            matchScore += basePoints
+          }
 
-        // Extra points for correct score
-        if (matchAnalysis.score.correct) {
-          matchScore += Math.floor(basePoints / 2)
-        }
+          // Extra points for correct score
+          if (matchAnalysis.score.correct) {
+            matchScore += Math.floor(basePoints / 2)
+          }
 
-        // Extra points for correct extra time prediction
-        if (matchAnalysis.extraTime.correct && actualResult.wentToExtraTime) {
-          matchScore += 1
-        }
+          // Extra points for correct extra time prediction
+          if (matchAnalysis.extraTime.correct && actualResult.wentToExtraTime) {
+            matchScore += 1
+          }
 
-        // Extra points for correct penalty winner
-        if (matchAnalysis.penalties.correct && actualResult.penaltyWinner) {
-          matchScore += 2
-        }
+          // Extra points for correct penalty winner
+          if (matchAnalysis.penalties.correct && actualResult.penaltyWinner) {
+            matchScore += 2
+          }
 
-        // Bonus for final match
-        if (matchId === "final" && matchAnalysis.winner.correct) {
-          matchScore += 5 // Bonus for correct champion
+          // Bonus for final match
+          if (matchId === "final" && matchAnalysis.winner.correct) {
+            matchScore += 5 // Bonus for correct champion
+          }
+
+          knockoutPoints[matchId] = matchScore
+          totalPoints += matchScore
         }
 
         matchAnalysis.points = matchScore
-        knockoutPoints[matchId] = matchScore
-        totalPoints += matchScore
-
         detailedAnalysis.knockout[matchId] = matchAnalysis
       })
     }
@@ -274,7 +276,22 @@ export function PredictionAnalysis({ prediction, onBack }: PredictionAnalysisPro
     return matchId
   }
 
-  if (!results || !analysis) {
+  // Organiza os palpites de mata-mata por fase
+  const organizeKnockoutPredictionsByPhase = () => {
+    if (!prediction.knockoutPredictions) return {}
+
+    return Object.entries(prediction.knockoutPredictions).reduce(
+      (acc, [matchId, match]) => {
+        const phase = getMatchPhase(matchId)
+        if (!acc[phase]) acc[phase] = []
+        acc[phase].push([matchId, match])
+        return acc
+      },
+      {} as Record<string, Array<[string, KnockoutMatch]>>,
+    )
+  }
+
+  if (!analysis) {
     return (
       <Card>
         <CardHeader>
@@ -376,141 +393,166 @@ export function PredictionAnalysis({ prediction, onBack }: PredictionAnalysisPro
         </TabsContent>
 
         <TabsContent value="knockout" className="space-y-6">
-          {Object.keys(analysis.detailedAnalysis.knockout).length === 0 ? (
+          {Object.keys(prediction.knockoutPredictions || {}).length === 0 ? (
             <Card>
               <CardHeader>
-                <CardTitle>Sem dados de mata-mata</CardTitle>
+                <CardTitle>Sem palpites de mata-mata</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-600">Ainda não há resultados de mata-mata para comparar com este palpite.</p>
+                <p className="text-gray-600">Este palpite não inclui previsões para a fase de mata-mata.</p>
               </CardContent>
             </Card>
           ) : (
-            Object.entries(
-              Object.entries(analysis.detailedAnalysis.knockout).reduce(
-                (acc, [matchId, data]) => {
-                  const phase = getMatchPhase(matchId)
-                  if (!acc[phase]) acc[phase] = []
-                  acc[phase].push([matchId, data])
-                  return acc
-                },
-                {} as Record<string, Array<[string, (typeof analysis.detailedAnalysis.knockout)[string]]>>,
-              ),
-            ).map(([phase, matches]) => (
-              <div key={phase}>
-                <h3 className="text-xl font-semibold mb-4">{getPhaseName(phase)}</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {matches.map(([matchId, data]) => {
-                    const userPrediction = prediction.knockoutPredictions?.[matchId]
-                    const actualResult = results.knockoutResults?.[matchId]
+            <>
+              {!results || Object.keys(results.knockoutResults || {}).length === 0 ? (
+                <Card className="mb-6">
+                  <CardHeader className="flex flex-row items-center gap-2">
+                    <AlertCircle className="h-5 w-5 text-amber-500" />
+                    <CardTitle>Resultados oficiais não disponíveis</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-gray-600">
+                      Os resultados oficiais do mata-mata ainda não foram registrados no sistema. Abaixo você pode ver
+                      os palpites feitos, mas sem comparação com os resultados reais.
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : null}
 
-                    if (!userPrediction || !actualResult) return null
+              {Object.entries(organizeKnockoutPredictionsByPhase()).map(([phase, matches]) => (
+                <div key={phase}>
+                  <h3 className="text-xl font-semibold mb-4">{getPhaseName(phase)}</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {matches.map(([matchId, userPrediction]) => {
+                      const actualResult = results?.knockoutResults?.[matchId]
+                      const data = analysis.detailedAnalysis.knockout[matchId]
 
-                    return (
-                      <Card key={matchId}>
-                        <CardHeader>
-                          <CardTitle className="text-center text-sm font-medium">
-                            {getMatchDescription(matchId)}
-                          </CardTitle>
-                          <CardDescription className="text-center">
-                            <Badge variant={data.points > 0 ? "default" : "outline"}>{data.points} pontos</Badge>
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div className="text-center">
-                            <p className="font-medium">
-                              {userPrediction.team1} vs {userPrediction.team2}
-                            </p>
-                          </div>
+                      return (
+                        <Card key={matchId}>
+                          <CardHeader>
+                            <CardTitle className="text-center text-sm font-medium">
+                              {getMatchDescription(matchId)}
+                            </CardTitle>
+                            {actualResult && (
+                              <CardDescription className="text-center">
+                                <Badge variant={data.points > 0 ? "default" : "outline"}>{data.points} pontos</Badge>
+                              </CardDescription>
+                            )}
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            <div className="text-center">
+                              <p className="font-medium">
+                                {userPrediction.team1} vs {userPrediction.team2}
+                              </p>
+                            </div>
 
-                          {/* Winner */}
-                          <div className="flex items-center justify-between p-2 rounded-lg bg-gray-50">
-                            <div className="flex items-center gap-2">
-                              {data.winner.correct ? (
-                                <CheckCircle2 className="h-5 w-5 text-green-500" />
-                              ) : (
-                                <XCircle className="h-5 w-5 text-red-500" />
-                              )}
-                              <span className="text-sm">Vencedor</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium">{data.winner.team}</span>
-                              {data.winner.correct && <Trophy className="h-4 w-4 text-yellow-500" />}
-                            </div>
-                          </div>
-
-                          {/* Score */}
-                          <div className="flex items-center justify-between p-2 rounded-lg bg-gray-50">
-                            <div className="flex items-center gap-2">
-                              {data.score.correct ? (
-                                <CheckCircle2 className="h-5 w-5 text-green-500" />
-                              ) : (
-                                <XCircle className="h-5 w-5 text-red-500" />
-                              )}
-                              <span className="text-sm">Placar</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium">
-                                {data.score.predicted[0]} - {data.score.predicted[1]}
-                              </span>
-                              {!data.score.correct && (
-                                <span className="text-xs text-gray-500">
-                                  (Real: {data.score.actual[0]} - {data.score.actual[1]})
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Extra Time */}
-                          <div className="flex items-center justify-between p-2 rounded-lg bg-gray-50">
-                            <div className="flex items-center gap-2">
-                              {data.extraTime.correct ? (
-                                <CheckCircle2 className="h-5 w-5 text-green-500" />
-                              ) : (
-                                <XCircle className="h-5 w-5 text-red-500" />
-                              )}
-                              <span className="text-sm">Prorrogação</span>
-                            </div>
-                            <div>
-                              <Badge variant={data.extraTime.predicted ? "default" : "outline"}>
-                                {data.extraTime.predicted ? "Sim" : "Não"}
-                              </Badge>
-                            </div>
-                          </div>
-
-                          {/* Penalties (if applicable) */}
-                          {(data.penalties.predicted || data.penalties.actual) && (
+                            {/* Winner */}
                             <div className="flex items-center justify-between p-2 rounded-lg bg-gray-50">
                               <div className="flex items-center gap-2">
-                                {data.penalties.correct && data.penalties.actual ? (
-                                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                                {actualResult ? (
+                                  data.winner.correct ? (
+                                    <CheckCircle2 className="h-5 w-5 text-green-500" />
+                                  ) : (
+                                    <XCircle className="h-5 w-5 text-red-500" />
+                                  )
                                 ) : (
-                                  <XCircle className="h-5 w-5 text-red-500" />
+                                  <span className="w-5 h-5 flex items-center justify-center">🏆</span>
                                 )}
-                                <span className="text-sm">Pênaltis</span>
+                                <span className="text-sm">Vencedor</span>
                               </div>
-                              <div>
-                                <span className="text-sm font-medium">
-                                  {data.penalties.predicted || "Não previsto"}
-                                </span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium">{userPrediction.winner}</span>
+                                {actualResult && data.winner.correct && <Trophy className="h-4 w-4 text-yellow-500" />}
                               </div>
                             </div>
-                          )}
 
-                          <div className="text-xs text-gray-500 mt-2">
-                            <p>Pontos base: {getBasePointsByPhase(phase)}</p>
-                            <p>+{Math.floor(getBasePointsByPhase(phase) / 2)} pts por placar exato</p>
-                            <p>+1 pt por prorrogação correta</p>
-                            <p>+2 pts por pênaltis corretos</p>
-                            {phase === "final" && <p>+5 pts por campeão correto</p>}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )
-                  })}
+                            {/* Score */}
+                            <div className="flex items-center justify-between p-2 rounded-lg bg-gray-50">
+                              <div className="flex items-center gap-2">
+                                {actualResult ? (
+                                  data.score.correct ? (
+                                    <CheckCircle2 className="h-5 w-5 text-green-500" />
+                                  ) : (
+                                    <XCircle className="h-5 w-5 text-red-500" />
+                                  )
+                                ) : (
+                                  <span className="w-5 h-5 flex items-center justify-center">⚽</span>
+                                )}
+                                <span className="text-sm">Placar</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium">
+                                  {userPrediction.regularTime1} - {userPrediction.regularTime2}
+                                </span>
+                                {actualResult && !data.score.correct && (
+                                  <span className="text-xs text-gray-500">
+                                    (Real: {data.score.actual[0]} - {data.score.actual[1]})
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Extra Time */}
+                            <div className="flex items-center justify-between p-2 rounded-lg bg-gray-50">
+                              <div className="flex items-center gap-2">
+                                {actualResult ? (
+                                  data.extraTime.correct ? (
+                                    <CheckCircle2 className="h-5 w-5 text-green-500" />
+                                  ) : (
+                                    <XCircle className="h-5 w-5 text-red-500" />
+                                  )
+                                ) : (
+                                  <span className="w-5 h-5 flex items-center justify-center">⏱️</span>
+                                )}
+                                <span className="text-sm">Prorrogação</span>
+                              </div>
+                              <div>
+                                <Badge variant={userPrediction.wentToExtraTime ? "default" : "outline"}>
+                                  {userPrediction.wentToExtraTime ? "Sim" : "Não"}
+                                </Badge>
+                              </div>
+                            </div>
+
+                            {/* Penalties (if applicable) */}
+                            {(userPrediction.penaltyWinner || (actualResult && actualResult.penaltyWinner)) && (
+                              <div className="flex items-center justify-between p-2 rounded-lg bg-gray-50">
+                                <div className="flex items-center gap-2">
+                                  {actualResult ? (
+                                    data.penalties.correct && data.penalties.actual ? (
+                                      <CheckCircle2 className="h-5 w-5 text-green-500" />
+                                    ) : (
+                                      <XCircle className="h-5 w-5 text-red-500" />
+                                    )
+                                  ) : (
+                                    <span className="w-5 h-5 flex items-center justify-center">🥅</span>
+                                  )}
+                                  <span className="text-sm">Pênaltis</span>
+                                </div>
+                                <div>
+                                  <span className="text-sm font-medium">
+                                    {userPrediction.penaltyWinner || "Não previsto"}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+
+                            {actualResult && (
+                              <div className="text-xs text-gray-500 mt-2">
+                                <p>Pontos base: {getBasePointsByPhase(phase)}</p>
+                                <p>+{Math.floor(getBasePointsByPhase(phase) / 2)} pts por placar exato</p>
+                                <p>+1 pt por prorrogação correta</p>
+                                <p>+2 pts por pênaltis corretos</p>
+                                {phase === "final" && <p>+5 pts por campeão correto</p>}
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))
+              ))}
+            </>
           )}
         </TabsContent>
       </Tabs>
