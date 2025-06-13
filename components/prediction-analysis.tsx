@@ -276,11 +276,29 @@ export function PredictionAnalysis({ prediction, onBack }: PredictionAnalysisPro
     return matchId
   }
 
-  // Organiza os palpites de mata-mata por fase
+  // Adicione esta função para definir a ordem correta das fases
+  const getPhaseOrder = (phase: string): number => {
+    switch (phase) {
+      case "roundOf16":
+        return 1
+      case "quarterFinals":
+        return 2
+      case "semiFinals":
+        return 3
+      case "thirdPlace":
+        return 4
+      case "final":
+        return 5
+      default:
+        return 99
+    }
+  }
+
+  // Modifique a função organizeKnockoutPredictionsByPhase para incluir a ordenação
   const organizeKnockoutPredictionsByPhase = () => {
     if (!prediction.knockoutPredictions) return {}
 
-    return Object.entries(prediction.knockoutPredictions).reduce(
+    const phaseGroups = Object.entries(prediction.knockoutPredictions).reduce(
       (acc, [matchId, match]) => {
         const phase = getMatchPhase(matchId)
         if (!acc[phase]) acc[phase] = []
@@ -289,6 +307,17 @@ export function PredictionAnalysis({ prediction, onBack }: PredictionAnalysisPro
       },
       {} as Record<string, Array<[string, KnockoutMatch]>>,
     )
+
+    // Ordenar as fases na ordem correta do torneio
+    return Object.entries(phaseGroups)
+      .sort((a, b) => getPhaseOrder(a[0]) - getPhaseOrder(b[0]))
+      .reduce(
+        (acc, [phase, matches]) => {
+          acc[phase] = matches
+          return acc
+        },
+        {} as Record<string, Array<[string, KnockoutMatch]>>,
+      )
   }
 
   if (!analysis) {
@@ -559,3 +588,4 @@ export function PredictionAnalysis({ prediction, onBack }: PredictionAnalysisPro
     </div>
   )
 }
+
