@@ -39,66 +39,70 @@ export function Leaderboard() {
         let score = 0
 
         // Score group predictions
-        Object.entries(results.groupResults).forEach(([group, result]) => {
-          const userPrediction = prediction.groupPredictions[group] || []
-          const actualQualified = result.qualified || []
+        if (results.groupResults && Object.keys(results.groupResults).length > 0) {
+          Object.entries(results.groupResults).forEach(([group, result]) => {
+            const userPrediction = prediction.groupPredictions?.[group] || []
+            const actualQualified = result?.qualified || []
 
-          // 2 points for each correct qualifier
-          userPrediction.forEach((team, index) => {
-            if (actualQualified.includes(team)) {
-              score += 2
-              // Extra point for correct position
-              if (actualQualified[index] === team) {
-                score += 1
+            // 2 points for each correct qualifier
+            userPrediction.forEach((team, index) => {
+              if (actualQualified.includes(team)) {
+                score += 2
+                // Extra point for correct position
+                if (actualQualified[index] === team) {
+                  score += 1
+                }
               }
-            }
+            })
           })
-        })
+        }
 
         // Score knockout predictions
-        Object.entries(prediction.knockoutPredictions).forEach(([matchId, userPrediction]) => {
-          const actualResult = results.knockoutResults[matchId]
-          if (!actualResult) return // Skip if no actual result yet
+        if (prediction.knockoutPredictions && results.knockoutResults) {
+          Object.entries(prediction.knockoutPredictions).forEach(([matchId, userPrediction]) => {
+            const actualResult = results.knockoutResults?.[matchId]
+            if (!actualResult) return // Skip if no actual result yet
 
-          // Points based on match phase
-          let basePoints = 0
-          if (matchId.startsWith("r16")) basePoints = 4
-          else if (matchId.startsWith("qf")) basePoints = 6
-          else if (matchId.startsWith("sf")) basePoints = 8
-          else if (matchId === "third") basePoints = 5
-          else if (matchId === "final") basePoints = 10
+            // Points based on match phase
+            let basePoints = 0
+            if (matchId.startsWith("r16")) basePoints = 4
+            else if (matchId.startsWith("qf")) basePoints = 6
+            else if (matchId.startsWith("sf")) basePoints = 8
+            else if (matchId === "third") basePoints = 5
+            else if (matchId === "final") basePoints = 10
 
-          // Correct winner
-          if (userPrediction.winner === actualResult.winner) {
-            score += basePoints
+            // Correct winner
+            if (userPrediction.winner === actualResult.winner) {
+              score += basePoints
 
-            // Bonus for final match
-            if (matchId === "final") {
-              score += 5 // Bonus for correct champion
+              // Bonus for final match
+              if (matchId === "final") {
+                score += 5 // Bonus for correct champion
+              }
             }
-          }
 
-          // Correct score
-          if (
-            userPrediction.regularTime1 === actualResult.regularTime1 &&
-            userPrediction.regularTime2 === actualResult.regularTime2
-          ) {
-            score += Math.floor(basePoints / 2)
-          }
+            // Correct score
+            if (
+              userPrediction.regularTime1 === actualResult.regularTime1 &&
+              userPrediction.regularTime2 === actualResult.regularTime2
+            ) {
+              score += Math.floor(basePoints / 2)
+            }
 
-          // Correct extra time prediction
-          if (
-            userPrediction.wentToExtraTime === (actualResult.wentToExtraTime || false) &&
-            actualResult.wentToExtraTime
-          ) {
-            score += 1
-          }
+            // Correct extra time prediction
+            if (
+              userPrediction.wentToExtraTime === (actualResult.wentToExtraTime || false) &&
+              actualResult.wentToExtraTime
+            ) {
+              score += 1
+            }
 
-          // Correct penalty winner
-          if (userPrediction.penaltyWinner === (actualResult.penaltyWinner || "") && actualResult.penaltyWinner) {
-            score += 2
-          }
-        })
+            // Correct penalty winner
+            if (userPrediction.penaltyWinner === (actualResult.penaltyWinner || "") && actualResult.penaltyWinner) {
+              score += 2
+            }
+          })
+        }
 
         return {
           ...prediction,
