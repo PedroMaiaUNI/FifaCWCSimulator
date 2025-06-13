@@ -30,6 +30,7 @@ export function PredictionForm() {
   const [knockoutPredictions, setKnockoutPredictions] = useState<Record<string, KnockoutMatch>>({})
   const [currentPhase, setCurrentPhase] = useState<"groups" | "knockout">("groups")
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Initialize group predictions
   useEffect(() => {
@@ -219,16 +220,20 @@ export function PredictionForm() {
       return
     }
 
-    const prediction: Prediction = {
-      id: Date.now().toString(),
-      playerName: playerName.trim(),
-      groupPredictions,
-      knockoutPredictions,
-      timestamp: new Date().toISOString(),
-      score: 0,
-    }
+    setIsSubmitting(true)
 
     try {
+      const prediction: Prediction = {
+        id: Date.now().toString(),
+        playerName: playerName.trim(),
+        groupPredictions,
+        knockoutPredictions,
+        timestamp: new Date().toISOString(),
+        score: 0,
+      }
+
+      console.log("Enviando palpite:", prediction)
+
       // Salvar usando o serviço de armazenamento
       await storageService.savePrediction(prediction)
 
@@ -249,6 +254,8 @@ export function PredictionForm() {
         text: `Erro ao salvar palpite: ${error instanceof Error ? error.message : "Erro desconhecido"}`,
         type: "error",
       })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -431,9 +438,9 @@ export function PredictionForm() {
               onClick={submitPrediction}
               size="lg"
               className="bg-green-600 hover:bg-green-700"
-              disabled={!isKnockoutComplete()}
+              disabled={!isKnockoutComplete() || isSubmitting}
             >
-              {isKnockoutComplete() ? "Submeter Palpite" : "Complete todos os jogos"}
+              {isSubmitting ? "Enviando..." : isKnockoutComplete() ? "Submeter Palpite" : "Complete todos os jogos"}
             </Button>
           </div>
         </div>
@@ -441,3 +448,4 @@ export function PredictionForm() {
     </div>
   )
 }
+

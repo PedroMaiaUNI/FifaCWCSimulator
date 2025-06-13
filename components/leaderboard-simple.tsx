@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Trophy, Medal, Award, BarChart3 } from "lucide-react"
+import { Trophy, Medal, Award, BarChart3, RefreshCw } from "lucide-react"
 import { PredictionAnalysis } from "@/components/prediction-analysis"
 import { storageService } from "@/lib/storage-service"
 import type { Prediction, TournamentResults } from "@/lib/types"
@@ -14,15 +14,20 @@ export function Leaderboard() {
   const [results, setResults] = useState<TournamentResults | null>(null)
   const [leaderboard, setLeaderboard] = useState<(Prediction & { calculatedScore: number })[]>([])
   const [selectedPrediction, setSelectedPrediction] = useState<Prediction | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
     loadData()
   }, [])
 
   const loadData = async () => {
+    setIsLoading(true)
     try {
       const savedPredictions = await storageService.getPredictions()
       const savedResults = await storageService.getResults()
+
+      console.log("Palpites carregados:", savedPredictions)
+      console.log("Resultados carregados:", savedResults)
 
       setPredictions(savedPredictions)
       if (savedResults) {
@@ -30,6 +35,8 @@ export function Leaderboard() {
       }
     } catch (error) {
       console.error("Erro ao carregar dados:", error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -133,11 +140,31 @@ export function Leaderboard() {
     return <PredictionAnalysis prediction={selectedPrediction} onBack={() => setSelectedPrediction(null)} />
   }
 
-  if (predictions.length === 0) {
+  if (isLoading) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Leaderboard</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8">
+            <RefreshCw className="h-8 w-8 animate-spin mx-auto text-gray-400" />
+            <p className="mt-2 text-gray-500">Carregando dados...</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (predictions.length === 0) {
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Leaderboard</CardTitle>
+          <Button variant="outline" size="sm" className="flex items-center gap-1" onClick={loadData}>
+            <RefreshCw className="h-4 w-4" />
+            <span>Atualizar</span>
+          </Button>
         </CardHeader>
         <CardContent>
           <p className="text-gray-600 text-center py-8">Nenhum palpite foi enviado ainda.</p>
@@ -149,11 +176,15 @@ export function Leaderboard() {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Trophy className="h-6 w-6 text-yellow-500" />
             Leaderboard
           </CardTitle>
+          <Button variant="outline" size="sm" className="flex items-center gap-1" onClick={loadData}>
+            <RefreshCw className="h-4 w-4" />
+            <span>Atualizar</span>
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
