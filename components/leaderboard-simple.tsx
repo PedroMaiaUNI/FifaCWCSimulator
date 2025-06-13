@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Trophy, Medal, Award, BarChart3 } from "lucide-react"
 import { PredictionAnalysis } from "@/components/prediction-analysis"
+import { storageService } from "@/lib/storage-service"
 import type { Prediction, TournamentResults } from "@/lib/types"
 
 export function Leaderboard() {
@@ -15,17 +16,22 @@ export function Leaderboard() {
   const [selectedPrediction, setSelectedPrediction] = useState<Prediction | null>(null)
 
   useEffect(() => {
-    const savedPredictions = localStorage.getItem("predictions")
-    const savedResults = localStorage.getItem("tournamentResults")
-
-    if (savedPredictions) {
-      setPredictions(JSON.parse(savedPredictions))
-    }
-
-    if (savedResults) {
-      setResults(JSON.parse(savedResults))
-    }
+    loadData()
   }, [])
+
+  const loadData = async () => {
+    try {
+      const savedPredictions = await storageService.getPredictions()
+      const savedResults = await storageService.getResults()
+
+      setPredictions(savedPredictions)
+      if (savedResults) {
+        setResults(savedResults)
+      }
+    } catch (error) {
+      console.error("Erro ao carregar dados:", error)
+    }
+  }
 
   useEffect(() => {
     if (predictions.length > 0 && results) {

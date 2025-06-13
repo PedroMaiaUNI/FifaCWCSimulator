@@ -20,9 +20,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import { GROUPS } from "@/lib/tournament-data"
 import { Trash2 } from "lucide-react"
+import { GROUPS } from "@/lib/tournament-data"
+import { storageService } from "@/lib/storage-service"
 import type { TournamentResults, KnockoutResult } from "@/lib/types"
+import { PredictionsManager } from "@/components/predictions-manager"
+import { ConnectionStatus } from "@/components/connection-status"
 
 export function AdminPanel() {
   const [results, setResults] = useState<TournamentResults>({
@@ -33,43 +36,66 @@ export function AdminPanel() {
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null)
 
   useEffect(() => {
-    const savedResults = localStorage.getItem("tournamentResults")
-    if (savedResults) {
-      setResults(JSON.parse(savedResults))
-    }
+    loadResults()
   }, [])
 
-  const saveResults = (newResults: TournamentResults) => {
-    setResults(newResults)
-    localStorage.setItem("tournamentResults", JSON.stringify(newResults))
-    setMessage({
-      text: "Os resultados foram atualizados com sucesso.",
-      type: "success",
-    })
-
-    setTimeout(() => {
-      setMessage(null)
-    }, 3000)
+  const loadResults = async () => {
+    try {
+      const savedResults = await storageService.getResults()
+      if (savedResults) {
+        setResults(savedResults)
+      }
+    } catch (error) {
+      console.error("Erro ao carregar resultados:", error)
+    }
   }
 
-  const resetAllResults = () => {
-    const emptyResults: TournamentResults = {
-      groupResults: {},
-      knockoutResults: {},
-      currentPhase: "groups",
+  const saveResults = async (newResults: TournamentResults) => {
+    try {
+      await storageService.saveResults(newResults)
+      setResults(newResults)
+
+      setMessage({
+        text: "Os resultados foram atualizados com sucesso.",
+        type: "success",
+      })
+
+      setTimeout(() => {
+        setMessage(null)
+      }, 3000)
+    } catch (error) {
+      setMessage({
+        text: `Erro ao salvar resultados: ${error instanceof Error ? error.message : "Erro desconhecido"}`,
+        type: "error",
+      })
     }
+  }
 
-    setResults(emptyResults)
-    localStorage.setItem("tournamentResults", JSON.stringify(emptyResults))
+  const resetAllResults = async () => {
+    try {
+      const emptyResults: TournamentResults = {
+        groupResults: {},
+        knockoutResults: {},
+        currentPhase: "groups",
+      }
 
-    setMessage({
-      text: "Todos os resultados foram resetados com sucesso.",
-      type: "success",
-    })
+      await storageService.saveResults(emptyResults)
+      setResults(emptyResults)
 
-    setTimeout(() => {
-      setMessage(null)
-    }, 3000)
+      setMessage({
+        text: "Todos os resultados foram resetados com sucesso.",
+        type: "success",
+      })
+
+      setTimeout(() => {
+        setMessage(null)
+      }, 3000)
+    } catch (error) {
+      setMessage({
+        text: `Erro ao resetar resultados: ${error instanceof Error ? error.message : "Erro desconhecido"}`,
+        type: "error",
+      })
+    }
   }
 
   const updateGroupResult = (group: string, team: string, position: "first" | "second") => {
@@ -345,7 +371,10 @@ export function AdminPanel() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Painel Administrativo</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle>Painel Administrativo</CardTitle>
+            <ConnectionStatus />
+          </div>
           {hasResults() && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -382,9 +411,10 @@ export function AdminPanel() {
       </Card>
 
       <Tabs defaultValue="groups" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="groups">Fase de Grupos</TabsTrigger>
           <TabsTrigger value="knockout">Mata-Mata</TabsTrigger>
+          <TabsTrigger value="predictions">Palpites</TabsTrigger>
         </TabsList>
 
         <TabsContent value="groups" className="space-y-4">
@@ -595,6 +625,10 @@ export function AdminPanel() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="predictions" className="space-y-4">
+          <PredictionsManager />
         </TabsContent>
       </Tabs>
     </div>

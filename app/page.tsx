@@ -14,7 +14,7 @@ export default function HomePage() {
   // Secret key combination to show admin tab
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && e.key === "Ç") {
+      if (e.ctrlKey && e.shiftKey && e.key === "A") {
         setShowAdminTab(true)
       }
     }

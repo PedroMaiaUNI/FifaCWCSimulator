@@ -16,6 +16,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { PredictionAnalysis } from "@/components/prediction-analysis"
+import { storageService } from "@/lib/storage-service"
 import type { Prediction } from "@/lib/types"
 
 export function PredictionsManager() {
@@ -27,40 +28,59 @@ export function PredictionsManager() {
     loadPredictions()
   }, [])
 
-  const loadPredictions = () => {
-    const savedPredictions = localStorage.getItem("predictions")
-    if (savedPredictions) {
-      setPredictions(JSON.parse(savedPredictions))
+  const loadPredictions = async () => {
+    try {
+      const savedPredictions = await storageService.getPredictions()
+      setPredictions(savedPredictions)
+    } catch (error) {
+      console.error("Erro ao carregar palpites:", error)
+      setMessage({
+        text: `Erro ao carregar palpites: ${error instanceof Error ? error.message : "Erro desconhecido"}`,
+        type: "error",
+      })
     }
   }
 
-  const deletePrediction = (id: string) => {
-    const updatedPredictions = predictions.filter((prediction) => prediction.id !== id)
-    localStorage.setItem("predictions", JSON.stringify(updatedPredictions))
-    setPredictions(updatedPredictions)
+  const deletePrediction = async (id: string) => {
+    try {
+      await storageService.deletePrediction(id)
+      setPredictions(predictions.filter((prediction) => prediction.id !== id))
 
-    setMessage({
-      text: "Palpite excluído com sucesso.",
-      type: "success",
-    })
+      setMessage({
+        text: "Palpite excluído com sucesso.",
+        type: "success",
+      })
 
-    setTimeout(() => {
-      setMessage(null)
-    }, 3000)
+      setTimeout(() => {
+        setMessage(null)
+      }, 3000)
+    } catch (error) {
+      setMessage({
+        text: `Erro ao excluir palpite: ${error instanceof Error ? error.message : "Erro desconhecido"}`,
+        type: "error",
+      })
+    }
   }
 
-  const deleteAllPredictions = () => {
-    localStorage.setItem("predictions", JSON.stringify([]))
-    setPredictions([])
+  const deleteAllPredictions = async () => {
+    try {
+      await storageService.deleteAllPredictions()
+      setPredictions([])
 
-    setMessage({
-      text: "Todos os palpites foram excluídos com sucesso.",
-      type: "success",
-    })
+      setMessage({
+        text: "Todos os palpites foram excluídos com sucesso.",
+        type: "success",
+      })
 
-    setTimeout(() => {
-      setMessage(null)
-    }, 3000)
+      setTimeout(() => {
+        setMessage(null)
+      }, 3000)
+    } catch (error) {
+      setMessage({
+        text: `Erro ao excluir palpites: ${error instanceof Error ? error.message : "Erro desconhecido"}`,
+        type: "error",
+      })
+    }
   }
 
   if (selectedPrediction) {

@@ -21,6 +21,7 @@ import { Trash2 } from "lucide-react"
 import { GROUPS } from "@/lib/tournament-data"
 import { TeamCard } from "@/components/team-card"
 import { MatchPrediction } from "@/components/match-prediction"
+import { storageService } from "@/lib/storage-service"
 import type { Prediction, KnockoutMatch } from "@/lib/types"
 
 export function PredictionForm() {
@@ -193,7 +194,7 @@ export function PredictionForm() {
     )
   }
 
-  const submitPrediction = () => {
+  const submitPrediction = async () => {
     if (!playerName.trim()) {
       setMessage({
         text: "Por favor, insira seu nome antes de submeter o palpite.",
@@ -227,23 +228,28 @@ export function PredictionForm() {
       score: 0,
     }
 
-    // Save to localStorage
-    const existingPredictions = JSON.parse(localStorage.getItem("predictions") || "[]")
-    existingPredictions.push(prediction)
-    localStorage.setItem("predictions", JSON.stringify(existingPredictions))
+    try {
+      // Salvar usando o serviço de armazenamento
+      await storageService.savePrediction(prediction)
 
-    setMessage({
-      text: `Palpite de ${playerName} foi salvo com sucesso!`,
-      type: "success",
-    })
+      setMessage({
+        text: `Palpite de ${playerName} foi salvo com sucesso!`,
+        type: "success",
+      })
 
-    // Reset form
-    resetForm()
+      // Reset form
+      resetForm()
 
-    // Clear message after 3 seconds
-    setTimeout(() => {
-      setMessage(null)
-    }, 3000)
+      // Clear message after 3 seconds
+      setTimeout(() => {
+        setMessage(null)
+      }, 3000)
+    } catch (error) {
+      setMessage({
+        text: `Erro ao salvar palpite: ${error instanceof Error ? error.message : "Erro desconhecido"}`,
+        type: "error",
+      })
+    }
   }
 
   const resetForm = () => {

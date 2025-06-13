@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CheckCircle2, XCircle, Trophy } from "lucide-react"
 import { GROUPS, KNOCKOUT_STRUCTURE } from "@/lib/tournament-data"
+import { storageService } from "@/lib/storage-service"
 import type { Prediction, TournamentResults } from "@/lib/types"
 
 interface PredictionAnalysisProps {
@@ -42,11 +43,19 @@ export function PredictionAnalysis({ prediction, onBack }: PredictionAnalysisPro
   } | null>(null)
 
   useEffect(() => {
-    const savedResults = localStorage.getItem("tournamentResults")
-    if (savedResults) {
-      setResults(JSON.parse(savedResults))
-    }
+    loadResults()
   }, [])
+
+  const loadResults = async () => {
+    try {
+      const savedResults = await storageService.getResults()
+      if (savedResults) {
+        setResults(savedResults)
+      }
+    } catch (error) {
+      console.error("Erro ao carregar resultados:", error)
+    }
+  }
 
   useEffect(() => {
     if (!results) return
