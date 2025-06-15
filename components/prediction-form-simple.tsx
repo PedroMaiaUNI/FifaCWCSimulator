@@ -17,14 +17,18 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Trash2 } from "lucide-react"
+import { Trash2, AlertTriangle } from "lucide-react"
 import { GROUPS } from "@/lib/tournament-data"
 import { TeamCard } from "@/components/team-card"
 import { MatchPrediction } from "@/components/match-prediction"
 import { storageService } from "@/lib/storage-service"
 import type { Prediction, KnockoutMatch } from "@/lib/types"
 
-export function PredictionForm() {
+interface PredictionFormProps {
+  predictionsOpen?: boolean
+}
+
+export function PredictionForm({ predictionsOpen = true }: PredictionFormProps) {
   const [playerName, setPlayerName] = useState("")
   const [groupPredictions, setGroupPredictions] = useState<Record<string, string[]>>({})
   const [knockoutPredictions, setKnockoutPredictions] = useState<Record<string, KnockoutMatch>>({})
@@ -40,6 +44,29 @@ export function PredictionForm() {
     })
     setGroupPredictions(initialGroups)
   }, [])
+
+  // Se os palpites estão fechados, mostrar aviso
+  const renderClosedPredictionsMessage = () => {
+    if (!predictionsOpen) {
+      return (
+        <Card className="border-red-200 bg-red-50">
+          <CardHeader className="text-center">
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <AlertTriangle className="h-8 w-8 text-red-600" />
+              <CardTitle className="text-2xl text-red-800">Palpites Encerrados</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="text-center">
+            <p className="text-red-700 mb-4">
+              O período para envio de palpites foi encerrado. Não é mais possível submeter novos palpites.
+            </p>
+            <p className="text-gray-600">Acesse o leaderboard para acompanhar os resultados e sua pontuação.</p>
+          </CardContent>
+        </Card>
+      )
+    }
+    return null
+  }
 
   const handleGroupPrediction = (group: string, team: string) => {
     const current = groupPredictions[group] || []
@@ -296,6 +323,10 @@ export function PredictionForm() {
 
   return (
     <div className="space-y-6">
+      {renderClosedPredictionsMessage()}
+
+      {predictionsOpen && (
+        <div>
       {message && (
         <div
           className={`p-4 rounded-md ${message.type === "success" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}
@@ -443,6 +474,8 @@ export function PredictionForm() {
               {isSubmitting ? "Enviando..." : isKnockoutComplete() ? "Submeter Palpite" : "Complete todos os jogos"}
             </Button>
           </div>
+          </div>
+          )}
         </div>
       )}
     </div>

@@ -6,15 +6,21 @@ import { Trophy, Users, BarChart3, Shield } from "lucide-react"
 import { PredictionForm } from "@/components/prediction-form-simple"
 import { AdminPanel } from "@/components/admin-panel-secure"
 import { Leaderboard } from "@/components/leaderboard-simple"
+import { PredictionsClosed } from "@/components/predictions-closed"
 
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState("predictions")
   const [showAdminTab, setShowAdminTab] = useState(false)
 
+  // Controle para fechar os palpites
+  // Defina como true para fechar os palpites, false para manter abertos
+  const [predictionsOpen, setPredictionsOpen] = useState(false) // Mudei para false para fechar os palpites
+
   // Secret key combination to show admin tab
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && e.key === "Ç") {
+      // Mudando de Ctrl+Shift+A para Ctrl+Shift+Ç
+      if (e.ctrlKey && e.shiftKey && e.key === "ç") {
         setShowAdminTab(true)
       }
     }
@@ -22,6 +28,13 @@ export default function HomePage() {
     window.addEventListener("keydown", handleKeyPress)
     return () => window.removeEventListener("keydown", handleKeyPress)
   }, [])
+
+  // Se os palpites estão fechados e o usuário está na aba de palpites, redirecionar para leaderboard
+  useEffect(() => {
+    if (!predictionsOpen && activeTab === "predictions") {
+      setActiveTab("leaderboard")
+    }
+  }, [predictionsOpen, activeTab])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
@@ -33,14 +46,21 @@ export default function HomePage() {
             <Trophy className="h-8 w-8 text-yellow-600" />
           </div>
           <p className="text-lg text-gray-600">Simulador de Palpites - 2025</p>
+          {!predictionsOpen && (
+            <p className="text-sm text-amber-600 font-medium mt-2">⚠️ Período de palpites encerrado</p>
+          )}
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className={`grid w-full mb-8 ${showAdminTab ? "grid-cols-3" : "grid-cols-2"}`}>
-            <TabsTrigger value="predictions" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Fazer Palpites
-            </TabsTrigger>
+          <TabsList
+            className={`grid w-full mb-8 ${showAdminTab ? (predictionsOpen ? "grid-cols-3" : "grid-cols-2") : predictionsOpen ? "grid-cols-2" : "grid-cols-1"}`}
+          >
+            {predictionsOpen && (
+              <TabsTrigger value="predictions" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Fazer Palpites
+              </TabsTrigger>
+            )}
             <TabsTrigger value="leaderboard" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Leaderboard
@@ -53,11 +73,18 @@ export default function HomePage() {
             )}
           </TabsList>
 
-          <TabsContent value="predictions">
-            <PredictionForm />
-          </TabsContent>
+          {predictionsOpen && (
+            <TabsContent value="predictions">
+              <PredictionForm />
+            </TabsContent>
+          )}
 
           <TabsContent value="leaderboard">
+            {!predictionsOpen && activeTab === "leaderboard" && (
+              <div className="mb-6">
+                <PredictionsClosed />
+              </div>
+            )}
             <Leaderboard />
           </TabsContent>
 
