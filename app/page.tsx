@@ -16,10 +16,25 @@ export default function HomePage() {
   // Defina como true para fechar os palpites, false para manter abertos
   const [predictionsOpen, setPredictionsOpen] = useState(false) // Mudei para false para fechar os palpites
 
-  // Secret key combination to show admin tab
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && e.key === "p") {
+      // Obter a combinação de teclas da variável de ambiente
+      const adminKey = process.env.NEXT_PUBLIC_ADMIN_KEY || 'fail'
+
+      // Parse da combinação de teclas
+      const keys = adminKey.toLowerCase().split("+")
+      const needsCtrl = keys.includes("ctrl")
+      const needsShift = keys.includes("shift")
+      const needsAlt = keys.includes("alt")
+      const mainKey = keys.find((key) => !["ctrl", "shift", "alt"].includes(key)) || "a"
+
+      // Verificar se a combinação foi pressionada
+      const ctrlPressed = needsCtrl ? e.ctrlKey : !e.ctrlKey
+      const shiftPressed = needsShift ? e.shiftKey : !e.shiftKey
+      const altPressed = needsAlt ? e.altKey : !e.altKey
+      const keyPressed = e.key.toLowerCase() === mainKey
+
+      if (ctrlPressed && shiftPressed && altPressed && keyPressed) {
         setShowAdminTab(true)
       }
     }
