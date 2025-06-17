@@ -2,7 +2,7 @@ export const GROUPS = {
   A: ["Porto", "Palmeiras", "Al-Ahly", "Inter Miami"],
   B: ["PSG", "Atletico Madrid", "Botafogo", "Seattle Sounders"],
   C: ["Bayern Munich", "Benfica", "Boca Juniors", "Auckland City"],
-  D: ["Flamengo", "Chelsea", "LA Galaxy", "Espérance"],
+  D: ["Flamengo", "Chelsea", "Los-Angeles-FC", "Espérance"],
   E: ["River Plate", "Inter Milan", "Monterrey", "Urawa Red Diamonds"],
   F: ["Fluminense", "Borussia Dortmund", "Ulsan Hyundai", "Mamelodi Sundowns"],
   G: ["Manchester City", "Juventus", "Al Ain", "Wydad Casablanca"],
